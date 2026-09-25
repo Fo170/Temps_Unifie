@@ -1,0 +1,49 @@
+#######################################
+# Syntax Coloring Map For Temps_Unifie
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+TIME_Init	KEYWORD1
+TIME_Maj	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+Temps_UTC	KEYWORD2
+Temps_Synchronise	KEYWORD2
+Temps_Serveur	KEYWORD2
+Temps_Fuseau	KEYWORD2
+Temps_DerniereSync_ms	KEYWORD2
+Temps_AgeSync_s	KEYWORD2
+Temps_Heure_UTC	KEYWORD2
+Temps_Date_UTC	KEYWORD2
+Temps_Heure_LOCAL	KEYWORD2
+Temps_Date_LOCAL	KEYWORD2
+NTP_FCT_Actif	KEYWORD2
+NTP_FCT_ServeurReel	KEYWORD2
+NTP_FCT_ModeTexte	KEYWORD2
+NTP_FCT_StatutSntpTexte	KEYWORD2
+NTP_FCT_Intervalle_ms	KEYWORD2
+NTP_FCT_SetIntervalle_ms	KEYWORD2
+NTP_FCT_ForcerSync	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+NTP_FCT_SERVEUR_NTP	LITERAL1
+NTP_FCT_FUSEAU_DEF	LITERAL1
+NTP_FCT_EPOCH_MINI	LITERAL1
+NTP_FCT_INTERVALLE_MIN_MS	LITERAL1
+NTP_FCT_INTERVALLE_DEF_MS	LITERAL1
+
+#######################################
+# Variables globales (LITERAL2)
+#######################################
+
+t_UTC	LITERAL2
+t_LOCAL	LITERAL2

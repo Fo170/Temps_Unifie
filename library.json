@@ -1,0 +1,54 @@
+{
+  "name": "Temps_Unifie",
+  "version": "1.0.0",
+  "description": "Gestion du temps unifiée multi-pays pour ESP32 : NTP via le SNTP natif de l'ESP-IDF, epoch UTC, heure/date locales (fuseau POSIX et serveur NTP passés à TIME_Init) et statut de synchronisation, sans aucune dépendance externe",
+  "keywords": [
+    "ntp",
+    "sntp",
+    "esp32",
+    "esp-idf",
+    "time",
+    "epoch",
+    "datetime",
+    "timezone",
+    "utc",
+    "france",
+    "cet",
+    "cest"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Fo170/Temps_Unifie.git"
+  },
+  "authors": [
+    {
+      "name": "Olivier FOURNET",
+      "email": "olivier.fournet@free.fr",
+      "url": "https://github.com/Fo170",
+      "maintainer": true
+    }
+  ],
+  "license": "GPL-3.0-only",
+  "homepage": "https://github.com/Fo170/Temps_Unifie",
+  "frameworks": "arduino",
+  "platforms": [
+    "espressif32"
+  ],
+  "headers": "Temps_Unifie.h",
+  "examples": [
+    {
+      "name": "Exemple Temps_Unifie (ESP32)",
+      "base": "exemple",
+      "files": ["src/main.cpp"]
+    }
+  ],
+  "export": {
+    "exclude": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "copilot-instructions.md",
+      "docs",
+      "tests"
+    ]
+  }
+}

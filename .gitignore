@@ -1,0 +1,8 @@
+# PlatformIO
+.pio/
+.vscode/
+
+# Fichiers d'instructions locaux (ne jamais publier)
+AGENTS.md
+CLAUDE.md
+copilot-instructions.md
