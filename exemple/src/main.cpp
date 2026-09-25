@@ -1,5 +1,5 @@
 // ============================================================================
-//  Exemple d'utilisation de la librairie Temps_Unifie (ESP32, SNTP natif)
+//  Exemple d'utilisation de la librairie Temps_Unifie (ESP8266 + ESP32)
 //
 //  Montre :
 //    - la connexion Wi-Fi puis TIME_Init(fuseau, serveur) ;
@@ -13,7 +13,12 @@
 //  Licence : GPL-3.0-only — Auteur : Olivier FOURNET (Fo170)
 // ============================================================================
 #include <Arduino.h>
-#include <WiFi.h>
+
+#if defined(ESP8266)
+  #include <ESP8266WiFi.h>
+#else
+  #include <WiFi.h>
+#endif
 
 // Identifiants Wi-Fi : si le dossier partagé _INCLUDE_/Arduino/ est dispo
 // (build_flags -I ../../..), on utilise connexions.h ; sinon on compile avec

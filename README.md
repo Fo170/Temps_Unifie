@@ -1,10 +1,10 @@
-# Temps_Unifie — Gestion du temps unifiée pour ESP32 (SNTP natif, multi-pays)
+# Temps_Unifie — Gestion du temps unifiée pour ESP8266 et ESP32 (SNTP natif, multi-pays)
 
 *Version 1.0.0 — GPL-3.0-only — Auteur : Olivier FOURNET (Fo170)*
 
-Librairie **header-only** (Arduino / PlatformIO) pour l'**ESP32** uniquement : accès au temps basé sur le **SNTP natif de l'ESP-IDF** (lwIP), **sans aucune dépendance externe** (ni `NTPClient`, ni `WiFiUdp`, ni `TimeLib`).
+Librairie **header-only** (Arduino / PlatformIO) pour **ESP8266 et ESP32** : accès au temps basé sur le **SNTP natif** (lwIP du core ESP8266 / ESP-IDF de l'ESP32), **sans aucune dépendance externe** (ni `NTPClient`, ni `WiFiUdp`, ni `TimeLib`).
 
-Elle est **multi-pays** : le fuseau (POSIX TZ) et le serveur NTP sont des paramètres de `TIME_Init()`, qui appelle lui-même `configTzTime()`. Elle fournit l'epoch UTC, l'heure/date **locale** (été/hiver automatiques), le serveur et le fuseau choisis, le statut de synchronisation et des helpers d'affichage (dont un bloc HTML prêt pour une page web).
+Elle est **multi-pays** : le fuseau (POSIX TZ) et le serveur NTP sont des paramètres de `TIME_Init()`, qui appelle lui-même `configTzTime()`. Elle fournit l'epoch UTC, l'heure/date **locale** (été/hiver automatiques), le serveur et le fuseau choisis, le statut de synchronisation et des helpers d'affichage (`String`).
 
 Le code, les commentaires et les logs série sont en **français**.
 
@@ -12,15 +12,16 @@ Le code, les commentaires et les logs série sont en **français**.
 
 ## 1. Pourquoi cette librairie ?
 
-Depuis les cores ESP32 récents, le SNTP est intégré à l'ESP-IDF : `configTzTime()` démarre le client NTP natif **et** règle le fuseau. Réutiliser un second client (`NTPClient` + `WiFiUdp`) est donc inutile et coûteux.
+Sur les cores ESP8266 et ESP32, le SNTP est intégré : `configTzTime()` démarre le client NTP natif **et** règle le fuseau. Réutiliser un second client (`NTPClient` + `WiFiUdp`) est donc inutile et coûteux.
 
 | | Ancienne approche (`NTPClient`) | `Temps_Unifie` (SNTP natif) |
 |---|---|---|
 | Dépendances | `NTPClient` + `WiFiUdp` | **aucune** |
-| Coût flash | ~2,8 Ko | 0 (déjà dans l'IDF) |
+| Coût flash | ~2,8 Ko | 0 (déjà dans le core) |
 | Socket UDP | 1 socket supplémentaire | aucune (gérée par lwIP) |
 | Fuseau / été-hiver | calcul manuel | TZ POSIX passé à `TIME_Init()` |
 | Multi-pays | non | oui (fuseau + serveur paramétrés) |
+| Plateformes | ESP8266 + ESP32 | ESP8266 + ESP32 |
 
 ## 2. Fonctionnalités
 
@@ -29,12 +30,15 @@ Depuis les cores ESP32 récents, le SNTP est intégré à l'ESP-IDF : `configTzT
 - **Choix du pays** : fuseau POSIX + serveur NTP passés à `TIME_Init(fuseau, serveur)`.
 - **Statut de synchronisation** (`Temps_Synchronise`, `Temps_AgeSync_s`).
 - **Diagnostic SNTP** : service actif, serveur réel, mode et statut bruts.
-- **Réglage de l'intervalle** de re-sync, avec application immédiate.
+- **Réglage de l'intervalle** de re-sync (ESP32 ; non exposé par le core ESP8266).
+- **Valeurs numériques brutes** `t_UTC` / `t_LOCAL`, sans passer par les `String`.
 
-## 3. Plateforme
+## 3. Plateformes
 
-- **ESP32 uniquement** (`espressif32`, framework Arduino). La librairie utilise `esp_sntp.h`/`sntp_*`, indisponibles sur ESP8266.
-- Aucun matériel supplémentaire (pas de RTC) : l'horloge système est celle de l'ESP32.
+- **ESP8266** (`espressif8266`) : SNTP lwIP, callback `settimeofday_cb()`. Intervalle, mode et statut SNTP non exposés par le core (voir §8).
+- **ESP32** (`espressif32`) : SNTP ESP-IDF (`esp_sntp.h`), intervalle réglable, mode/statut disponibles.
+- Aucun matériel supplémentaire (pas de RTC) : l'horloge système est celle du MCU.
+- `configTzTime()` et `localtime_r()`/`gmtime_r()` sont disponibles sur les deux cores.
 
 ## 4. Installation
 
@@ -61,7 +65,11 @@ Télécharger le dépôt puis l'ajouter via *Croquis → Inclure une bibliothèq
 3. **`TIME_Maj()`** dans `loop()` — non bloquant.
 
 ```cpp
-#include <WiFi.h>
+#if defined(ESP8266)
+  #include <ESP8266WiFi.h>
+#else
+  #include <WiFi.h>
+#endif
 #include <Temps_Unifie.h>
 
 #define TZ_FRANCE "CET-1CEST,M3.5.0,M10.5.0/3"
@@ -130,15 +138,15 @@ Les helpers `Temps_Heure_UTC()`, `Temps_Date_UTC()`, `Temps_Heure_LOCAL()` et `T
 
 ### Diagnostic SNTP
 
-| Fonction | Description |
-|---|---|
-| `bool NTP_FCT_Actif()` | Vrai si le SNTP est actif |
-| `String NTP_FCT_ServeurReel()` | Serveur réellement configuré dans le SNTP |
-| `String NTP_FCT_ModeTexte()` | `"SMOOTH"` ou `"IMMED"` |
-| `String NTP_FCT_StatutSntpTexte()` | `"COMPLETED"`, `"IN_PROGRESS"` ou `"RESET"` |
-| `uint32_t NTP_FCT_Intervalle_ms()` | Intervalle de re-sync courant (ms) |
-| `uint32_t NTP_FCT_SetIntervalle_ms(uint32_t ms)` | Change et applique immédiatement l'intervalle |
-| `bool NTP_FCT_ForcerSync()` | Force une synchronisation immédiate |
+| Fonction | Description | ESP8266 |
+|---|---|---|
+| `bool NTP_FCT_Actif()` | Vrai si le SNTP est actif | oui |
+| `String NTP_FCT_ServeurReel()` | Serveur réellement configuré dans le SNTP | oui |
+| `String NTP_FCT_ModeTexte()` | `"SMOOTH"` ou `"IMMED"` | renvoie `"POLL"` |
+| `String NTP_FCT_StatutSntpTexte()` | `"COMPLETED"`, `"IN_PROGRESS"` ou `"RESET"` | déduit de `Temps_Synchronise()` |
+| `uint32_t NTP_FCT_Intervalle_ms()` | Intervalle de re-sync courant (ms) | renvoie `0` |
+| `uint32_t NTP_FCT_SetIntervalle_ms(uint32_t ms)` | Change et applique immédiatement l'intervalle | renvoie `0` (non supporté) |
+| `bool NTP_FCT_ForcerSync()` | Force une synchronisation immédiate | renvoie `false` |
 
 ### Macros de configuration (surchargeables avant inclusion)
 
@@ -169,21 +177,23 @@ Exemples de chaînes POSIX :
 
 ## 8. Points d'attention
 
-- **Défaut ESP-IDF = 3 h de re-sync** (`CONFIG_LWIP_SNTP_UPDATE_DELAY`). `TIME_Init()` applique 60 s ; `NTP_FCT_SetIntervalle_ms()` appelle `sntp_restart()` car `sntp_set_sync_interval()` seul n'agit qu'à l'expiration du cycle courant.
+- **ESP32** : défaut ESP-IDF = 3 h de re-sync (`CONFIG_LWIP_SNTP_UPDATE_DELAY`). `TIME_Init()` applique 60 s ; `NTP_FCT_SetIntervalle_ms()` appelle `sntp_restart()` car `sntp_set_sync_interval()` seul n'agit qu'à l'expiration du cycle courant.
+- **ESP8266** : l'intervalle, le mode et le statut SNTP ne sont **pas** exposés par le core (lwIP) ; `NTP_FCT_SetIntervalle_ms`/`NTP_FCT_ForcerSync` sont sans effet, `NTP_FCT_ModeTexte` renvoie `"POLL"` et `NTP_FCT_StatutSntpTexte` est déduit de `Temps_Synchronise()`.
 - `TIME_Init()` **démarre** le SNTP via `configTzTime()` : ne pas appeler `configTzTime()` en double avant.
-- `sntp_get_sync_status()` est **transitoire** (repasse vite à `RESET`) : le statut fiable est `Temps_Synchronise()` + `Temps_AgeSync_s()` (via le callback `ntpFctOnSync`).
+- Sur ESP32, `sntp_get_sync_status()` est **transitoire** (repasse vite à `RESET`) : le statut fiable est `Temps_Synchronise()` + `Temps_AgeSync_s()` (via le callback).
 - La librairie **ne démarre pas le Wi-Fi** : connectez-vous avant `TIME_Init()`.
 - Variables d'état et fonctions sont en `static` (linkage interne) : la librairie est prévue pour être incluse dans l'unité de compilation principale (`.ino`/`main.cpp`).
 
 ## 9. Exemple
 
-Voir `exemple/` (PlatformIO, env `esp32dev`) :
+Voir `exemple/` (PlatformIO, envs `esp12e` et `esp32dev`) :
 
 ```bash
 cd exemple
-pio run                 # compilation
-pio run -t upload       # téléversement
-pio device monitor      # moniteur série (115200 bauds)
+pio run -e esp12e            # compilation ESP8266
+pio run -e esp32dev          # compilation ESP32
+pio run -e esp32dev -t upload   # téléversement
+pio device monitor           # moniteur série (115200 bauds)
 ```
 
 ## 10. Licence

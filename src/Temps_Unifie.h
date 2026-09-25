@@ -1,5 +1,5 @@
 // ============================================================================
-//  Temps_Unifie.h  —  Gestion du temps UNIFIEE pour ESP32 (SNTP natif ESP-IDF)
+//  Temps_Unifie.h  —  Gestion du temps UNIFIEE pour ESP8266 + ESP32
 //
 //  @file      Temps_Unifie.h
 //  @version   1.0.0
@@ -8,21 +8,27 @@
 //  @copyright GPL-3.0-only
 //  @see       https://github.com/Fo170/Temps_Unifie
 //
-//  NTP « classique » MULTI-PAYS basé sur le SNTP NATIF de l'ESP32. Aucune
-//  dépendance externe : ni NTPClient, ni WiFiUdp, ni TimeLib.
+//  NTP « classique » MULTI-PAYS basé sur le SNTP natif : ESP-IDF (lwIP) sur
+//  ESP32 et SNTP lwIP du core ESP8266. Aucune dépendance externe : ni NTPClient,
+//  ni WiFiUdp, ni TimeLib. `configTzTime()` existe sur les deux plateformes.
 //
-//  Historique : fork de l'ancien Temps_Unifie.h (NTPClient + TimeLib) qui
-//  supportait ESP8266 + ESP32. Depuis le 25/09/2026 :
-//    - NTPClient retiré : l'horloge système est déjà synchronisée par le SNTP
-//      natif (lwIP) démarré par `configTzTime()`. On lit donc simplement
-//      `time()` / `localtime_r()` / `gmtime_r()` (newlib) ;
-//    - TimeLib retiré : inutilisé (aucun symbole TimeLib dans le firmware).
+//  Historique : fork de l'ancien Temps_Unifie.h (NTPClient + TimeLib). Depuis le
+//  25/09/2026 : plus de client NTP externe ni de TimeLib — l'horloge système est
+//  déjà synchronisée par le SNTP natif démarré par `configTzTime()`. On lit donc
+//  simplement `time()` / `localtime_r()` / `gmtime_r()` (newlib).
 //  → gain flash (NTPClient ~2,8 Ko) + plus de socket UDP ni de 2e client NTP.
 //
-//  ⚠️ Multi-pays : le fuseau (POSIX TZ) et le serveur NTP sont désormais des
-//  paramètres de `TIME_Init()`, qui appelle lui-même `configTzTime()`.
-//  `localtime_r()` renvoie ainsi directement l'heure LOCALE du pays choisi,
-//  sans calcul manuel d'heure d'été. Aucun impact sur le TLS (horloge système).
+//  ⚠️ Différences de plateforme (masquées par l'API commune) :
+//    - ESP32   : `esp_sntp.h`, callback `sntp_set_time_sync_notification_cb()`,
+//                intervalle réglable (`sntp_set_sync_interval`/`sntp_restart`),
+//                mode et statut SNTP disponibles.
+//    - ESP8266 : lwIP (`sntp.h` + `coredecls.h`), callback `settimeofday_cb()`,
+//                intervalle/mode/statut non exposés (renvoient 0 / "POLL" /
+//                dérivés de Temps_Synchronise()).
+//
+//  ⚠️ Multi-pays : le fuseau (POSIX TZ) et le serveur NTP sont des paramètres de
+//  `TIME_Init()`, qui appelle lui-même `configTzTime()`. `localtime_r()` renvoie
+//  ainsi directement l'heure LOCALE du pays choisi, sans calcul manuel d'été.
 //
 //  Exemples de fuseaux POSIX :
 //    France  : "CET-1CEST,M3.5.0,M10.5.0/3"
@@ -43,7 +49,15 @@
 
 #include <Arduino.h>
 #include <time.h>
-#include <esp_sntp.h>   // sntp_set_time_sync_notification_cb() (SNTP natif ESP-IDF)
+
+#if defined(ESP8266)
+  #include <coredecls.h>   // settimeofday_cb()
+  #include <sntp.h>        // sntp_enabled(), sntp_getservername() (lwIP)
+#elif defined(ESP32)
+  #include <esp_sntp.h>    // SNTP natif ESP-IDF
+#else
+  #error "Temps_Unifie ne supporte que l'ESP8266 et l'ESP32."
+#endif
 
 // ----------------------------------------------------------------------------
 //  Configuration (surchargeable AVANT l'inclusion via #define)
@@ -82,10 +96,17 @@ static time_t t_UTC   = 0;
 static time_t t_LOCAL = 0;
 
 // Callback appelé par le SNTP natif à chaque synchronisation réussie.
-// @param tv  instant de la synchronisation (fourni par lwIP, non utilisé)
+//  - ESP32   : fourni par lwIP, reçoit l'instant de synchro (ignoré).
+//  - ESP8266 : `settimeofday_cb()` ne transmet aucun paramètre.
+#if defined(ESP8266)
+static void ntpFctOnSync(void)
+#else
 static void ntpFctOnSync(struct timeval* tv)
+#endif
 {
+#if defined(ESP32)
   (void)tv;
+#endif
   ntpFctDerniereSync_ms = millis();
   ntpFctSynchronise     = true;
 }
@@ -97,29 +118,45 @@ static void ntpFctOnSync(struct timeval* tv)
 // ----------------------------------------------------------------------------
 
 // Intervalle de re-sync courant, en millisecondes.
+// Renvoie 0 sur ESP8266 (intervalle lwIP non exposé par le core).
 static uint32_t NTP_FCT_Intervalle_ms(void)   // intervalle courant (ms)
 {
+#if defined(ESP32)
   return sntp_get_sync_interval();
+#else
+  return 0;
+#endif
 }
 
 // Change l'intervalle de re-sync SNTP (ms) et l'applique IMMÉDIATEMENT.
 // ⚠️ sntp_set_sync_interval() seul n'agit qu'à l'expiration du cycle en cours
 //    (jusqu'à 3 h) → on appelle sntp_restart() pour re-armer tout de suite.
+// ESP8266 : non supporté (renvoie 0).
 // @param ms  intervalle voulu (borné à NTP_FCT_INTERVALLE_MIN_MS)
 // @return la valeur réellement appliquée
 static uint32_t NTP_FCT_SetIntervalle_ms(uint32_t ms)
 {
+#if defined(ESP32)
   if (ms < NTP_FCT_INTERVALLE_MIN_MS) ms = NTP_FCT_INTERVALLE_MIN_MS;
   sntp_set_sync_interval(ms);
   sntp_restart();
   return sntp_get_sync_interval();
+#else
+  (void)ms;
+  return 0;
+#endif
 }
 
 // Force une synchronisation immédiate (garde l'intervalle courant).
+// ESP8266 : non exposé, renvoie false.
 // @return true si le redémarrage du SNTP a été accepté
 static bool NTP_FCT_ForcerSync(void)
 {
+#if defined(ESP32)
   return sntp_restart();
+#else
+  return false;
+#endif
 }
 
 // ----------------------------------------------------------------------------
@@ -160,13 +197,19 @@ static void TIME_Init(const char* fuseau, const char* serveur)
   ntpFctServeur = serveur;
 
   // Branche le callback AVANT le démarrage pour capter la 1re synchronisation.
+#if defined(ESP8266)
+  settimeofday_cb(ntpFctOnSync);
+#else
   sntp_set_time_sync_notification_cb(ntpFctOnSync);
+#endif
 
-  // Démarre le client SNTP natif de l'ESP-IDF ET applique le fuseau POSIX.
+  // Démarre le client SNTP natif (ESP-IDF ou lwIP) ET applique le fuseau POSIX.
   configTzTime(ntpFctFuseau, ntpFctServeur);
 
+#if defined(ESP32)
   // Ramène l'intervalle au défaut voulu (60 s) au lieu des 3 h de l'IDF.
   NTP_FCT_SetIntervalle_ms(NTP_FCT_INTERVALLE_DEF_MS);
+#endif
 
   // Rafraîchit t_UTC / t_LOCAL ; si l'horloge est déjà réglée (ex. init
   // multiple), cale aussi l'âge de la dernière synchro.
@@ -231,25 +274,38 @@ static bool NTP_FCT_Actif(void)            { return sntp_enabled(); }
 // Serveur NTP réellement configuré dans le SNTP (fallback serveur choisi).
 static String NTP_FCT_ServeurReel(void)     // serveur réellement configuré dans le SNTP
 {
+#if defined(ESP8266)
+  const char* s = sntp_getservername(0);
+#else
   const char* s = esp_sntp_getservername(0);
+#endif
   return s ? String(s) : String(ntpFctServeur);
 }
 
-// Mode de synchronisation lisible : "SMOOTH" ou "IMMED".
+// Mode de synchronisation lisible : "SMOOTH"/"IMMED" (ESP32) ou "POLL" (ESP8266).
 static String NTP_FCT_ModeTexte(void)
 {
+#if defined(ESP32)
   return (sntp_get_sync_mode() == SNTP_SYNC_MODE_SMOOTH) ? "SMOOTH" : "IMMED";
+#else
+  return "POLL";   // mode unique du SNTP lwIP sur ESP8266
+#endif
 }
 
 // Statut SNTP brut lisible : "COMPLETED", "IN_PROGRESS" ou "RESET".
 static String NTP_FCT_StatutSntpTexte(void)
 {
+#if defined(ESP32)
   switch (sntp_get_sync_status())
   {
     case SNTP_SYNC_STATUS_COMPLETED:   return "COMPLETED";
     case SNTP_SYNC_STATUS_IN_PROGRESS: return "IN_PROGRESS";
     default:                           return "RESET";
   }
+#else
+  // lwIP ESP8266 n'expose pas le statut : on le déduit de l'heure système.
+  return Temps_Synchronise() ? "COMPLETED" : "RESET";
+#endif
 }
 
 // ----------------------------------------------------------------------------

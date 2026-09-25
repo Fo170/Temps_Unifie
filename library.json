@@ -1,10 +1,11 @@
 {
   "name": "Temps_Unifie",
   "version": "1.0.0",
-  "description": "Gestion du temps unifiée multi-pays pour ESP32 : NTP via le SNTP natif de l'ESP-IDF, epoch UTC, heure/date locales (fuseau POSIX et serveur NTP passés à TIME_Init) et statut de synchronisation, sans aucune dépendance externe",
+  "description": "Gestion du temps unifiée multi-pays pour ESP8266 et ESP32 : NTP via le SNTP natif (lwIP/ESP-IDF), epoch UTC, heure/date locales (fuseau POSIX et serveur NTP passés à TIME_Init) et statut de synchronisation, sans aucune dépendance externe",
   "keywords": [
     "ntp",
     "sntp",
+    "esp8266",
     "esp32",
     "esp-idf",
     "time",
@@ -32,6 +33,7 @@
   "homepage": "https://github.com/Fo170/Temps_Unifie",
   "frameworks": "arduino",
   "platforms": [
+    "espressif8266",
     "espressif32"
   ],
   "headers": "Temps_Unifie.h",
