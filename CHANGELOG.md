@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.0.1] - 2026-10-17
+
+### ✨ Added — macro de version `__<LIB>_H_VERSION__`
+
+Chaque header déclare désormais sa version via une macro préprocesseur,
+source **unique** (un projet hôte peut l'agréger, ex. page `/version`).
+
+### 🏷️ Divers
+
+- Version `1.0.0` → `1.0.1` (`library.json` + `library.properties`)
+
+---
+
 ## [1.0.0] - 2026-09-25
 ### Ajouté
 - Publication en **librairie header-only** `Temps_Unifie` (un seul `src/Temps_Unifie.h`, sans `.cpp`) pour **ESP8266 et ESP32**.

@@ -1,6 +1,6 @@
 {
   "name": "Temps_Unifie",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Gestion du temps unifiée multi-pays pour ESP8266 et ESP32 : NTP via le SNTP natif (lwIP/ESP-IDF), epoch UTC, heure/date locales (fuseau POSIX et serveur NTP passés à TIME_Init) et statut de synchronisation, sans aucune dépendance externe",
   "keywords": [
     "ntp",

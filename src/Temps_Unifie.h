@@ -49,7 +49,7 @@
 
 
 // Version de la librairie (source UNIQUE — agrégée par liste_lib.h)
-#define __TEMPS_UNIFIE_H_VERSION__ "1.0.0"
+#define __TEMPS_UNIFIE_H_VERSION__ "1.0.1"
 #include <Arduino.h>
 #include <time.h>
 
